@@ -23,3 +23,265 @@ rzxplay.py --no-screen --fps 0 --quiet --map cyclone.map cyclone.rzx
 sna2ctl.py -m cyclone.map cyclone.z80 > cyclone.ctl
 sna2skool.py -c cyclone.ctl cyclone.z80 > cyclone.skool
 ```
+
+## Reverse-engineered notes from the starter disassembly
+
+The current `cyclone.skool` is still mostly unannotated, but the execution trace,
+strings and routine structure already reveal a fair amount about the game.
+
+### What the game appears to be
+
+The game is a helicopter/flight game with a world map, a main 3D flight view and
+resource pressure from **fuel**, **time** and **wind**.
+
+The clearest mission and help text lives near the end of the image:
+
+- `58770`: `COLLECT FIVE CRATES`
+- `58791`: `AND RETURN TO BASE`
+- `58811`: `RESCUE SURVIVORS FOR`
+- `58833`: `EXTRA POINTS`
+- `58713`: `HELICOPTER POSITION`
+- `58734`: `CYCLONE LOCATION`
+- `58752`: `LEAVING MAP AREA`
+- `58989`: `WIND SPEED INCREASES`
+- `59010`: `WHEN APPROACHING CYCLONE`
+
+That strongly suggests the core loop is:
+
+1. fly around the island map,
+2. collect five crates,
+3. return to base before fuel or time run out,
+4. optionally rescue survivors for bonus points,
+5. cope with stronger wind near the cyclone.
+
+### Front-end, menu and control selection
+
+The title/menu flow starts at `57984`:
+
+- `57984` plays a sound effect, waits for a key, clears the screen and draws the
+  option screen.
+- `58014` handles option keys `1` through `6`.
+- `58167` is the `SELECT OPTION` caption.
+- `58181` / `58197` / `58214` / `58230` / `58246` / `58262` are the visible menu
+  entries:
+  - `1 INFORMATION`
+  - `2 KEYBOARD`
+  - `3 INTERFACE 2`
+  - `4 KEMPSTON`
+  - `5 PROTEK/AGF`
+  - `6 START GAME`
+
+The input abstraction routine is `32726`, which dispatches to different readers
+based on the selected control scheme:
+
+- `32748`+ reads keyboard rows via port `254`
+- `32803`+ reads another keyboard/joystick layout
+- `32850`+ reads Kempston from port `31`
+- `32889`+ reads another keyboard layout
+
+The resulting 5-bit control state is stored in `29986`.
+
+The in-game control legend is embedded at `58592` onward:
+
+- `UP`, `LEFT`, `DOWN`, `RIGHT`
+- `FORWARD`
+- `VIEW CHANGE`
+- `MAP OR MAIN SCREEN`
+
+### Main game loop
+
+The core loop begins at `23350`. Each frame it calls a stable sequence of
+subsystems:
+
+- `33017` - apply input/view toggle state
+- `33966` - clear/update transient playfield state
+- `30418` - rebuild object/terrain occupancy data
+- `34800`
+- `37300` - update one of the cockpit/status gauges
+- `35729`
+- `36000`
+- `32272`
+- `34479` - collision/status processing
+- `62362`
+- `35450` - fuel/time related update
+- `34260` - object/world update
+- `32726` / `32938` - fresh input and special key handling
+
+This gives a good high-level engine split even before the routines are fully
+named.
+
+### Player state and saved state
+
+The mutable game-state block starts at `29952`.
+
+Two useful clues:
+
+- `23323` copies `30052..30151` into `29952..30051` when a game starts.
+- `37555` copies `30152..30251` back into `29952..30051` after a crash/restart.
+
+So the image contains at least:
+
+- a live state block at `29952`
+- an initial/default state block at `30052`
+- a restore/checkpoint style block at `30152`
+
+Known or strongly implied fields include:
+
+- `29956` - current view/mode toggle used by `33017`
+- `29957` - crash/death flag checked by the main loop
+- `29973` / `29974` - failure/transition flags used by the loop, interrupt code
+  and timeout handling
+- `29986` - current abstracted input bits
+- `29997` - menu/title state flag used by the interrupt handler
+
+### Objectives, counters and HUD
+
+The HUD and instruction text is unusually descriptive:
+
+- `58861`: `CRATES LEFT`
+- `58873`: `ALTIMETER`
+- `58884`: `SPEEDOMETER`
+- `58897`: `FUEL GAUGE`
+- `58908`: `TIME LEFT`
+- `58919`: `COMPASS`
+- `58928`: `HEADING`
+- `58937`: `LIVES`
+- `58944`: `VIEW SELECTED`
+- `58969`: `COLLISION`
+- `58980`: `WARNING`
+
+The score templates at `26141` and `26150` also suggest dedicated score and high
+score displays:
+
+- `26141`: `S......0`
+- `26150`: `H......0`
+
+### Failure states
+
+Two explicit fail messages are already easy to locate:
+
+- `23538`: `NO FUEL`
+- `35438`: `NO TIME`
+
+The main loop jumps to the fuel message via `23532`, and it jumps to the timeout
+path at `37576` when `29980 == 222`.
+
+Crash handling is centered on `37446`, which:
+
+- repeatedly reruns the world/render pipeline,
+- increments a counter at `37445`,
+- eventually returns to `57984` after enough failures/restarts,
+- restores state from the backup block and re-enters the main loop.
+
+### Rendering and screen layout
+
+Several routines are straightforward screen infrastructure:
+
+- `34006` clears the screen bitmap (`16384`) and attribute area (`22528`)
+- `36110` paints the bordered playfield attributes
+- `34036` copies character/graphic data into screen and UDG working areas
+- `36189` iterates an object table at `62000` and blits 8-pixel columns into the
+  display
+- `36444` draws fixed frame/border elements from tables around `29752`
+
+`30252` and `30418` appear to prepare the 3D/world presentation from lookup tables
+around `63310`, while `32272`, `35729` and `36000` are likely major view/projection
+steps because they sit in the heart of the frame loop and feed the renderer.
+
+### Objects, world data and place names
+
+The active object table starts at `62000` and is walked in 20-byte records:
+
+- `30418` scans entries at `62000`, compares them against player position values
+  at `29952`..`29955`, and stops on a terminator byte `255`.
+- When a match is found it stores the object pointer at `30034`.
+- `36189` also walks the same table in 20-byte steps and uses fields at offsets
+  `+10..+17` as render metadata and screen destinations.
+
+The place-name table begins at `27216`. Names are separated with marker bytes
+`253`, `254` and terminated by `255`. Decoded names include:
+
+- `BANANA`
+- `ORTE ROCKS`
+- `KOKOLA`
+- `LAGOON`
+- `PEAK`
+- `BASE`
+- `GILLIGANS`
+- `RED`
+- `SKEG`
+- `BONE`
+- `GIANTS GATEWAY`
+- `CLAW`
+- `LUKELAND ISLES`
+- `ENTERPRISE`
+- `ISLAND`
+
+`36322` onward ties the object table to this name table, so at least some objects
+or map zones have human-readable location labels.
+
+### Compass, heading and direction text
+
+Direction/orientation handling is visible in several places:
+
+- `33405`: `SOUTH`
+- `34252`: `NORTH`
+- `58919`: `COMPASS`
+- `58928`: `HEADING`
+
+`33017` updates `29958`, `29959` and `29960` as wraparound values from `0..15`,
+which looks like a 16-step heading system.
+
+### Wind, speed and motion
+
+Wind is definitely a gameplay mechanic rather than just flavour text:
+
+- `26705` contains a large HUD string including `WIND`, `DANGER` and `FORCE`
+- `58989` / `59010` explicitly warn that wind speed rises near the cyclone
+
+`33300` and `33356` adjust `29965` upward and downward in response to control bits,
+with limits at `0` and `60`, so `29965` is very likely the forward speed or
+throttle value later consumed by `35450`.
+
+`35450` converts that speed-like value into a smaller banded value, looks it up
+through tables near `31361`/`31371`, and can trigger the `NO FUEL` path by setting
+`29973`.
+
+### Sound and interrupt behaviour
+
+The standard beeper routine is `949`, and it is used throughout the menu, warning
+and gameplay code.
+
+Two especially useful sound-related routines are:
+
+- `33730` - interrupt handler; preserves registers, checks menu/game flags and
+  drives a beeper pattern via port `254`
+- `33850` - startup/audio initialisation, also tied to a random-looking pointer in
+  `29980`
+
+The interrupt handler suppresses its effect while in title/menu mode and during
+some failure states, which implies it is part of the live in-flight ambience.
+
+### Other strong clues worth following up
+
+- `34233`: `BEWARE AIRCRAFT` - likely a warning or signage for hostile/ambient air
+  traffic
+- `58847`: `PRESS ANY KEY` - information/help screen prompt
+- `58944`: `VIEW SELECTED` / `58959`: `WITH KEY` - confirms multiple camera or
+  display modes
+- the block at `58167`..`58861` looks like a complete instructions screen that is
+  worth fully decoding next
+
+### Good next annotation targets inside `cyclone.skool`
+
+If this repo is developed further, the highest-value routines to name and annotate
+next are probably:
+
+- `23350` - frame loop
+- `32726` / `32938` / `33017` - control and mode handling
+- `30252` / `30418` - terrain/object preparation
+- `34260` / `34479` - world update and collision/warning handling
+- `35450` - fuel/speed/wind interaction
+- `36000` / `32272` / `36189` - view construction and object rendering
+- `37446` / `37576` - crash and timeout handling
+- `57984` / `58014` / `58088` - title, options and help flow
