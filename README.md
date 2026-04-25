@@ -2,6 +2,10 @@
 
 SkoolKit-generated starter disassembly for the ZX Spectrum game in this repo.
 
+Use the repository filenames exactly as shown below: the tape archive is
+`Cyclone.tzx.zip`, while the recording and generated artifacts use the lowercase
+`cyclone` prefix.
+
 ## Generated artifacts
 
 - `cyclone.z80` - snapshot extracted from `cyclone.rzx`
