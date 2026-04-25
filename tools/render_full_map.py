@@ -209,7 +209,7 @@ def render_map(memory: bytes, world: list[list[int]], bounds: tuple[int, int, in
     return rows, width, height
 
 
-def positive_int(value: str) -> int:
+def scale_value(value: str) -> int:
     parsed = int(value)
     if parsed < 1:
         raise argparse.ArgumentTypeError("scale must be at least 1")
@@ -225,7 +225,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Render the full 256x256 world instead of cropping to the occupied gameplay bounds",
     )
-    parser.add_argument("--scale", type=positive_int, default=1, help="Nearest-neighbour scale factor for the output image")
+    parser.add_argument("--scale", type=scale_value, default=1, help="Nearest-neighbour scale factor for the output image")
     return parser.parse_args()
 
 
