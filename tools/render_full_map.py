@@ -13,6 +13,8 @@ OBJECT_RECORD_SIZE = 20
 OBJECT_TABLE_TERMINATOR = 255
 TILE_BITMAP_BASE = 0xFA00
 TILE_ATTRIBUTE_BASE = 0xFE00
+TILE_INDEX_MASK = 0x7F
+ATTRIBUTE_BRIGHT = 0x40
 SEA_TILE = 0
 CELL_SIZE = 8
 WORLD_SIZE = 256
@@ -151,7 +153,7 @@ def build_world_map(memory: bytes, chunks: list[MapChunk]) -> tuple[list[bytearr
 
 
 def _tile_bitmap(memory: bytes, tile: int) -> bytes:
-    tile_index = tile & 0x7F
+    tile_index = tile & TILE_INDEX_MASK
     start = TILE_BITMAP_BASE + tile_index * CELL_SIZE
     return memory[start : start + CELL_SIZE]
 
@@ -192,7 +194,7 @@ def render_map(memory: bytes, world: list[bytearray], bounds: tuple[int, int, in
         for cell_x in range(min_x, max_x + 1):
             tile = world[cell_y][cell_x]
             attr = _tile_attribute(memory, tile)
-            palette_offset = 8 if attr & 0x40 else 0
+            palette_offset = 8 if attr & ATTRIBUTE_BRIGHT else 0
             ink = bytes(SPECTRUM_PALETTE[palette_offset + (attr & 0x07)])
             paper = bytes(SPECTRUM_PALETTE[palette_offset + ((attr >> 3) & 0x07)])
             for bitmap_row_index, bitmap_row in enumerate(_tile_bitmap(memory, tile)):
@@ -207,7 +209,7 @@ def render_map(memory: bytes, world: list[bytearray], bounds: tuple[int, int, in
     return rows, width, height
 
 
-def scale_value(value: str) -> int:
+def parse_scale_argument(value: str) -> int:
     parsed = int(value)
     if parsed < 1:
         raise argparse.ArgumentTypeError("scale must be at least 1")
@@ -223,7 +225,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Render the full 256x256 world instead of cropping to the occupied gameplay bounds",
     )
-    parser.add_argument("--scale", type=scale_value, default=1, help="Nearest-neighbour scale factor for the output image")
+    parser.add_argument("--scale", type=parse_scale_argument, default=1, help="Nearest-neighbour scale factor for the output image")
     return parser.parse_args()
 
 
