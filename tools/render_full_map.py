@@ -130,7 +130,7 @@ def parse_map_chunks(memory: bytes) -> list[MapChunk]:
 
 
 def build_world_map(memory: bytes, chunks: list[MapChunk]) -> tuple[list[bytearray], tuple[int, int, int, int]]:
-    world = [bytearray([SEA_TILE]) * WORLD_SIZE for _ in range(WORLD_SIZE)]
+    world = [bytearray([SEA_TILE] * WORLD_SIZE) for _ in range(WORLD_SIZE)]
     claimed = [bytearray(WORLD_SIZE) for _ in range(WORLD_SIZE)]
     min_x = min(chunk.left for chunk in chunks)
     max_x = max(chunk.right for chunk in chunks)
