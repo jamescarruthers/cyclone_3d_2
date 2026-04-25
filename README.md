@@ -16,7 +16,6 @@ Use the repository filenames exactly as shown below: the tape archive is
 ## Commands used
 
 ```sh
-unzip -o Cyclone.tzx.zip -d /tmp/cyclone_tzx
 rzxinfo.py --extract cyclone.rzx
 mv cyclone.rzx.001.z80 cyclone.z80
 rzxplay.py --no-screen --fps 0 --quiet --map cyclone.map cyclone.rzx
