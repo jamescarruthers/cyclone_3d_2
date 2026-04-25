@@ -210,6 +210,13 @@ def render_map(memory: bytes, world: list[list[int]], bounds: tuple[int, int, in
     return rows, width, height
 
 
+def positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be at least 1")
+    return parsed
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render Cyclone's reverse engineered full gameplay map to a PNG")
     parser.add_argument("snapshot", type=Path, help="Path to the .z80 snapshot")
@@ -219,14 +226,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Render the full 256x256 world instead of cropping to the occupied gameplay bounds",
     )
-    parser.add_argument("--scale", type=int, default=1, help="Nearest-neighbour scale factor for the output image")
+    parser.add_argument("--scale", type=positive_int, default=1, help="Nearest-neighbour scale factor for the output image")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    if args.scale < 1:
-        raise ValueError("--scale must be at least 1")
 
     memory = load_snapshot_memory(args.snapshot)
     chunks = parse_map_chunks(memory)
@@ -247,7 +252,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     try:
-        raise SystemExit(main())
+        sys.exit(main())
     except Exception as exc:  # pragma: no cover - CLI surface
         print(f"error: {exc}", file=sys.stderr)
-        raise SystemExit(1)
+        sys.exit(1)
