@@ -110,6 +110,35 @@ subsystems:
 This gives a good high-level engine split even before the routines are fully
 named.
 
+### Gameplay map storage and full-map rendering
+
+The gameplay map can now be reconstructed directly from the snapshot.
+
+- The table at `62000` is a 20-byte-per-entry chunk table. The main map selector
+  at `30418` walks this table top-to-bottom and keeps the first matching entry, so
+  the chunk order defines the overlap priority.
+- For each chunk, bytes `+2..+5` are the inclusive world-space rectangle and
+  bytes `+10..+11` point at the top-left of that chunk's terrain data.
+- Each terrain row is `128` bytes wide. For a world position `(x, y)` inside a
+  chunk, the terrain byte comes from `source + (y - top) * 128 + (x - left)`.
+- Terrain bytes are renderer indices rather than direct pixels. The bitmap comes
+  from `0xFA00 + (index & 0x7f) * 8` and the Spectrum attribute byte comes from
+  `0xFE00 + index`. Untouched world cells render correctly as tile `0`, which is
+  the sea tile.
+
+The repo now includes a renderer that turns that reconstructed world map into a
+PNG without any external dependencies:
+
+```sh
+python tools/render_full_map.py cyclone.z80 /tmp/cyclone_full_map.png
+```
+
+Useful options:
+
+- `--scale 2` to enlarge the output with nearest-neighbour scaling
+- `--full-world` to render the full `256x256` world instead of cropping to the
+  occupied gameplay bounds
+
 ### Player state and saved state
 
 The mutable game-state block starts at `29952`.
