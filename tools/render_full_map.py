@@ -211,7 +211,7 @@ def render_map(memory: bytes, world: list[list[int]], bounds: tuple[int, int, in
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Render Cyclone's reverse-engineered full gameplay map to a PNG")
+    parser = argparse.ArgumentParser(description="Render Cyclone's reverse engineered full gameplay map to a PNG")
     parser.add_argument("snapshot", type=Path, help="Path to the .z80 snapshot")
     parser.add_argument("output", type=Path, help="Path to the PNG to write")
     parser.add_argument(
@@ -248,6 +248,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except Exception as error:  # pragma: no cover - CLI surface
-        print(f"error: {error}", file=sys.stderr)
+    except Exception as exc:  # pragma: no cover - CLI surface
+        print(f"error: {exc}", file=sys.stderr)
         raise SystemExit(1)
