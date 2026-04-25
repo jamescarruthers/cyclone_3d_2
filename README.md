@@ -17,6 +17,7 @@ from the snapshot and execution trace derived from `cyclone.rzx`.
 
 ```sh
 rzxinfo.py --extract cyclone.rzx
+# The extracted snapshot was cyclone.rzx.001.z80 for the bundled recording.
 mv cyclone.rzx.001.z80 cyclone.z80
 rzxplay.py --no-screen --fps 0 --quiet --map cyclone.map cyclone.rzx
 sna2ctl.py -m cyclone.map cyclone.z80 > cyclone.ctl
