@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from __future__ import annotations
 
 import argparse
 import struct
@@ -62,7 +61,7 @@ def _decompress_z80_block(block: bytes) -> bytes:
     output = bytearray()
     index = 0
     while index < len(block):
-        if index + 3 < len(block) and block[index] == 0xED and block[index + 1] == 0xED:
+        if index + 4 <= len(block) and block[index] == 0xED and block[index + 1] == 0xED:
             output.extend([block[index + 3]] * block[index + 2])
             index += 4
             continue
@@ -253,6 +252,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # pragma: no cover - CLI surface
+    except (OSError, ValueError, struct.error) as exc:  # pragma: no cover - CLI surface
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(1)
