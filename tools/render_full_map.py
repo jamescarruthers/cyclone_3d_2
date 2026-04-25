@@ -213,7 +213,7 @@ def render_map(memory: bytes, world: list[list[int]], bounds: tuple[int, int, in
 def positive_int(value: str) -> int:
     parsed = int(value)
     if parsed < 1:
-        raise argparse.ArgumentTypeError("must be at least 1")
+        raise argparse.ArgumentTypeError("scale must be at least 1")
     return parsed
 
 
