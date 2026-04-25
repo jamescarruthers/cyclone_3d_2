@@ -129,8 +129,9 @@ def parse_map_chunks(memory: bytes) -> list[MapChunk]:
     return chunks
 
 
-def build_world_map(memory: bytes, chunks: list[MapChunk]) -> tuple[list[list[int]], tuple[int, int, int, int]]:
-    world = [[None for _ in range(WORLD_SIZE)] for _ in range(WORLD_SIZE)]
+def build_world_map(memory: bytes, chunks: list[MapChunk]) -> tuple[list[bytearray], tuple[int, int, int, int]]:
+    world = [bytearray([SEA_TILE]) * WORLD_SIZE for _ in range(WORLD_SIZE)]
+    claimed = [bytearray(WORLD_SIZE) for _ in range(WORLD_SIZE)]
     min_x = min(chunk.left for chunk in chunks)
     max_x = max(chunk.right for chunk in chunks)
     min_y = min(chunk.top for chunk in chunks)
@@ -140,14 +141,11 @@ def build_world_map(memory: bytes, chunks: list[MapChunk]) -> tuple[list[list[in
         for y in range(chunk.top, chunk.bottom + 1):
             source_row = chunk.source + (y - chunk.top) * 128
             row = world[y]
+            seen = claimed[y]
             for x in range(chunk.left, chunk.right + 1):
-                if row[x] is None:
+                if not seen[x]:
                     row[x] = memory[source_row + (x - chunk.left)]
-
-    for y in range(WORLD_SIZE):
-        for x in range(WORLD_SIZE):
-            if world[y][x] is None:
-                world[y][x] = SEA_TILE
+                    seen[x] = 1
 
     return world, (min_x, min_y, max_x, max_y)
 
@@ -181,7 +179,7 @@ def write_png(path: Path, rgb_rows: list[bytes], width: int, height: int) -> Non
     path.write_bytes(png)
 
 
-def render_map(memory: bytes, world: list[list[int]], bounds: tuple[int, int, int, int], scale: int, crop: bool) -> tuple[list[bytes], int, int]:
+def render_map(memory: bytes, world: list[bytearray], bounds: tuple[int, int, int, int], scale: int, crop: bool) -> tuple[list[bytes], int, int]:
     min_x, min_y, max_x, max_y = bounds if crop else (0, 0, WORLD_SIZE - 1, WORLD_SIZE - 1)
     width_cells = max_x - min_x + 1
     height_cells = max_y - min_y + 1
@@ -195,13 +193,13 @@ def render_map(memory: bytes, world: list[list[int]], bounds: tuple[int, int, in
             tile = world[cell_y][cell_x]
             attr = _tile_attribute(memory, tile)
             palette_offset = 8 if attr & 0x40 else 0
-            ink = SPECTRUM_PALETTE[palette_offset + (attr & 0x07)]
-            paper = SPECTRUM_PALETTE[palette_offset + ((attr >> 3) & 0x07)]
+            ink = bytes(SPECTRUM_PALETTE[palette_offset + (attr & 0x07)])
+            paper = bytes(SPECTRUM_PALETTE[palette_offset + ((attr >> 3) & 0x07)])
             for bitmap_row_index, bitmap_row in enumerate(_tile_bitmap(memory, tile)):
                 pixel_row = bytearray()
                 for bit in range(7, -1, -1):
                     colour = ink if bitmap_row & (1 << bit) else paper
-                    pixel_row.extend(bytes(colour) * scale)
+                    pixel_row.extend(colour * scale)
                 for scale_row in range(scale):
                     scanlines[bitmap_row_index * scale + scale_row].extend(pixel_row)
         rows.extend(bytes(scanline) for scanline in scanlines)
